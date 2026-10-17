@@ -44,7 +44,7 @@ p{margin:0 0 1em}
 .bar .lab{flex:1;min-width:0;font-size:15px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prog{height:4px;background:var(--line);border-radius:2px;margin-top:4px;overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:var(--plum)}
-.yt{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:10px;overflow:hidden;background:#000;margin-top:16px}.yt>*{position:absolute;inset:0;width:100%;height:100%}
+.lock{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--page)}.lock input{font:inherit;width:8em;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}.lock button{font:inherit;background:var(--plum);color:var(--page);border:0;border-radius:8px;padding:8px 14px;cursor:pointer}.lock .msg{flex-basis:100%;font-size:15px;color:var(--soft)}
 .note{font-size:15px;color:var(--soft)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -56,7 +56,7 @@ p{margin:0 0 1em}
   <h1>스무 살 쇼팽의 회오리 왈츠</h1>
   <p>이 책은 곡이 흘러가는 순서대로 읽어요. 장마다 이야기를 읽고, 악보 조각을 보고, 보라색 버튼을 눌러 조성진 선생님의 연주로 그 부분만 들어 보세요.</p>
   <button class="play" data-s="0.4" data-e="171.7" data-l="처음부터 끝까지"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 8l6 4-6 4z" fill="currentColor"/></svg>곡 전체 듣기 <span class="t">2분 51초</span></button>
-  <div class="yt"><div id="yt"></div></div>
+  <form class="lock" id="lock"><label for="pw">음원 열기 비밀번호</label><input id="pw" type="password" inputmode="numeric" autocomplete="off"><button type="submit">열기</button><span class="msg" id="msg">비밀번호를 넣어야 연주가 들려요.</span></form>
   <p class="note" style="margin-top:14px">이 악보는 쇼팽의 제자 미쿨리 선생님이 만든 악보예요. 선생님이 주시는 악보와 손가락 번호나 작은 기호가 조금 다를 수 있어요. 다르면 선생님 악보를 따르세요.</p>
 </header>
 
@@ -234,30 +234,47 @@ p{margin:0 0 1em}
     <li><label><input type="checkbox" id="c6">쉬는 마디도 마음속으로 세었어요</label></li>
   </ul>
 </section>
-<p class="note">악보: 쇼팽 왈츠 마단조 유작, 카를 미쿨리 편집(G. Schirmer, 1894), IMSLP. 연주: 조성진, 2026년 4월 2일 런던 공연 실황.</p>
+<p class="note">악보: 쇼팽 왈츠 마단조 유작, 카를 미쿨리 편집(G. Schirmer, 1894), IMSLP. 연주: 조성진, 2026년 4월 2일 런던 공연 실황. </p>
 </div>
 
 <div class="bar"><div class="in">
   <button id="tog" aria-label="재생/멈춤">▶</button>
   <div style="flex:1;min-width:0"><div class="lab" id="lab">듣고 싶은 장의 보라색 버튼을 눌러요</div><div class="prog"><i id="pg"></i></div></div>
 </div></div>
-<script src="https://www.youtube.com/iframe_api"></script>
+<audio id="au" preload="auto"></audio>
+
 <script>
-const OFF=1.5; // 페이지 시간 + 1.5초 = 유튜브 영상 시간
-const tog=document.getElementById('tog'),lab=document.getElementById('lab'),pg=document.getElementById('pg');
-let yt=null,ready=false,seg=null,cur=null,tick=null;
-function onYouTubeIframeAPIReady(){yt=new YT.Player('yt',{videoId:'PhshE7bShVw',playerVars:{playsinline:1,rel:0,start:3},events:{onReady:()=>{ready=true}}});}
+const au=document.getElementById('au'),tog=document.getElementById('tog'),lab=document.getElementById('lab'),pg=document.getElementById('pg');
+let seg=null,cur=null;
 function setBtn(b){document.querySelectorAll('.play').forEach(x=>x.classList.toggle('on',x===b));}
-function stop(){if(ready)yt.pauseVideo();clearInterval(tick);tog.textContent='▶';setBtn(null);}
-function run(){clearInterval(tick);tick=setInterval(()=>{const t=yt.getCurrentTime()-OFF;
-  pg.style.width=Math.min(100,Math.max(0,(t-seg.s)/(seg.e-seg.s)*100))+'%';if(t>=seg.e)stop();},150);}
+function stop(){au.pause();tog.textContent='▶';setBtn(null);}
 document.querySelectorAll('.play').forEach(b=>b.addEventListener('click',()=>{
-  if(!ready){lab.textContent='플레이어 준비 중이에요. 잠시 뒤 다시 눌러요.';return;}
-  if(cur===b&&yt.getPlayerState()===1){stop();return;}
+  if(!au.src){lab.textContent='먼저 위에서 비밀번호를 넣어 주세요.';document.getElementById('pw').focus();return;}
+  if(cur===b&&!au.paused){stop();return;}
   seg={s:+b.dataset.s,e:+b.dataset.e};cur=b;lab.textContent=b.dataset.l;
-  yt.seekTo(seg.s+OFF,true);yt.playVideo();tog.textContent='❚❚';setBtn(b);run();
+  au.currentTime=seg.s;au.play().then(()=>{tog.textContent='❚❚';setBtn(b);}).catch(()=>{lab.textContent='소리를 재생할 수 없어요. 다시 눌러 보세요.';});
 }));
-tog.addEventListener('click',()=>{if(!seg||!ready)return;
-  if(yt.getPlayerState()!==1){if(yt.getCurrentTime()-OFF>=seg.e-0.1)yt.seekTo(seg.s+OFF,true);yt.playVideo();tog.textContent='❚❚';setBtn(cur);run();}else stop();});
+tog.addEventListener('click',()=>{
+  if(!seg)return;
+  if(au.paused){if(au.currentTime>=seg.e-0.05)au.currentTime=seg.s;au.play();tog.textContent='❚❚';setBtn(cur);}else stop();
+});
+au.addEventListener('timeupdate',()=>{
+  if(!seg)return;
+  pg.style.width=Math.min(100,Math.max(0,(au.currentTime-seg.s)/(seg.e-seg.s)*100))+'%';
+  if(au.currentTime>=seg.e){stop();}
+});
+
+document.getElementById('lock').addEventListener('submit',async e=>{
+  e.preventDefault();const msg=document.getElementById('msg');msg.textContent='여는 중이에요…';
+  try{
+    const buf=new Uint8Array(await (await fetch('waltz14.enc')).arrayBuffer());
+    const salt=buf.slice(4,20),iv=buf.slice(20,32),ct=buf.slice(32);
+    const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(document.getElementById('pw').value),'PBKDF2',false,['deriveKey']);
+    const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:600000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+    const mp3=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,ct);
+    au.src=URL.createObjectURL(new Blob([mp3],{type:'audio/mpeg'}));
+    msg.textContent='열렸어요! 보라색 버튼을 눌러 들어 보세요.';document.getElementById('lock').querySelector('button').disabled=true;
+  }catch(err){msg.textContent='비밀번호가 맞지 않아요. 다시 넣어 주세요.';}
+});
 </script>
 </body></html>
